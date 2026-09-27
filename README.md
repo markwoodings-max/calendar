@@ -10,6 +10,10 @@ The finished files are in [`dist/`](dist/):
 |---|---|---|
 | `healthy-habits-2027-letter.pdf` | US Letter, landscape | US/Canada buyers, and iPad |
 | `healthy-habits-2027-a4.pdf` | A4, landscape | UK/EU/AU buyers, and iPad |
+| `healthy-habits-app.zip` | Phone/desktop app | See [The app](#the-app) |
+
+A good product ladder is the printable PDF at a low price, the app on its own,
+and a bundle of both at a premium.
 
 ## What's inside
 
@@ -27,6 +31,54 @@ The finished files are in [`dist/`](dist/):
 Every page has clickable tabs down the right edge (Year, Jan–Dec, Notes). Each
 month page also has Calendar / Habits / Reflection buttons, and the PDF has a
 full bookmark outline.
+
+## The app
+
+[`app/`](app/) holds a phone app version of the planner. It's an installable
+web app (a "PWA"): it works offline, it can be added to the home screen on
+iPhone, Android and desktop, and it needs no app-store approval.
+
+What buyers can do in it:
+
+- **Today**: tick off habits (with streaks), pick a mood, count glasses of water, log sleep and write a note.
+- **Month**: set a monthly intention, see a calendar shaded by how many habits were done each day (tap a day to open it), and scroll the full habit grid.
+- **Year**: a Year in Pixels mood grid, plus totals for habits done, perfect days and best streak.
+- **Reflect**: the same monthly prompts as the PDF, a 1–10 rating and an automatic habit-completion %.
+- **Habits**: add, rename, reorder or delete habits, choose the week start and water goal, and back up or restore their data.
+
+Everything a buyer enters stays private on their own device. There are no
+accounts and no server, so you have nothing to run or pay for beyond hosting
+the files. Buyers should use **Export backup** to move to a new phone.
+
+To rebrand it, edit `app/config.js` (title, your name, default habits, mood colours).
+When you ship an update, change `VERSION` in `app/sw.js` so installed copies refresh.
+
+### Getting it to buyers
+
+The app is plain files, so any static host works:
+
+1. **Host it.** The simplest option is Netlify Drop (drag the `app` folder onto
+   app.netlify.com/drop), or turn on GitHub Pages for this repo. Both are free
+   and use HTTPS, which offline mode and installing need.
+2. **Sell the link.** On Etsy, Gumroad, Payhip or a Stan Store, make the
+   product's delivery file a short PDF with the app link and install steps:
+   - **iPhone:** open in Safari → Share → *Add to Home Screen*
+   - **Android:** open in Chrome → ⋮ → *Install app*
+3. You can also sell `dist/healthy-habits-app.zip` as the download itself. Buyers
+   who want to use it on a phone still need to host it somewhere, so the link is
+   friendlier for most buyers.
+
+A shared link can be passed on to people who didn't buy. For a $5–$15 product
+that is usually an acceptable trade-off. If it becomes a problem, you can add
+license keys (Gumroad and Lemon Squeezy both offer them).
+
+### Apple App Store / Google Play (optional, later)
+
+The same code can be wrapped as a native app with [Capacitor](https://capacitorjs.com/)
+if you want a real App Store or Play Store listing. It costs more: Apple charges
+$99 a year and Google a one-time $25, both run a review, and each store takes a
+15–30% cut. Apple also sometimes rejects apps that are "just a website", so plan
+to add native touches such as daily reminder notifications first.
 
 ## Customising and regenerating
 
