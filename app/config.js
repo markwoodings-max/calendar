@@ -14,6 +14,7 @@ window.HH_CONFIG = {
     "Write 3 gratitudes",
   ],
   waterGoal: 8,
+  reminderTime: "20:00", // default daily reminder time (24h)
   weekStart: "sunday", // or "monday"
   moods: [
     { label: "Great", color: "#7A9E7E" },

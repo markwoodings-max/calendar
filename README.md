@@ -45,6 +45,12 @@ What buyers can do in it:
 - **Year**: a Year in Pixels mood grid, plus totals for habits done, perfect days and best streak.
 - **Reflect**: the same monthly prompts as the PDF, a 1–10 rating and an automatic habit-completion %.
 - **Habits**: add, rename, reorder or delete habits, choose the week start and water goal, and back up or restore their data.
+- **Daily reminder**: switch it on and pick a time (8 PM by default). It reaches buyers three ways:
+  - **"Add reminder to my calendar"** creates a daily repeating calendar event with an alert. It works on every phone, even with the app closed, and it's the most reliable option on iPhone.
+  - **Background notifications** on Android and desktop Chrome/Edge when the app is installed. The browser chooses the exact minute, usually close to the set time.
+  - **In-app nudges** when the app is opened after the reminder time, if habits are still unticked.
+
+  Web apps can't schedule a notification for an exact time without a push server. That's why the calendar option exists, and it's what makes reminders work with no server to run.
 
 Everything a buyer enters stays private on their own device. There are no
 accounts and no server, so you have nothing to run or pay for beyond hosting
@@ -78,7 +84,8 @@ The same code can be wrapped as a native app with [Capacitor](https://capacitorj
 if you want a real App Store or Play Store listing. It costs more: Apple charges
 $99 a year and Google a one-time $25, both run a review, and each store takes a
 15–30% cut. Apple also sometimes rejects apps that are "just a website", so plan
-to add native touches such as daily reminder notifications first.
+to add native touches first. Swapping the reminder for Capacitor's Local
+Notifications plugin gives exact-time reminders on both platforms.
 
 ## Customising and regenerating
 

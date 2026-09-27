@@ -18,13 +18,17 @@ const PROMPTS = [
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
+function defaultReminder() {
+  return { on: false, time: CFG.reminderTime || "20:00" };
+}
+
 function freshState() {
   return {
     version: 1,
     habits: CFG.defaultHabits.map(name => ({ id: uid(), name })),
     days: {},        // "YYYY-MM-DD" -> { done: [habitId], mood, water, sleep, note }
     months: {},      // "YYYY-MM"    -> { intention, rating, word, wins, blockers, ... }
-    settings: { weekStart: CFG.weekStart, waterGoal: CFG.waterGoal },
+    settings: { weekStart: CFG.weekStart, waterGoal: CFG.waterGoal, reminder: defaultReminder() },
   };
 }
 
@@ -37,9 +41,11 @@ function load() {
 }
 
 let state = load();
+state.settings.reminder = Object.assign(defaultReminder(), state.settings.reminder);
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast("Couldn't save — storage is full or blocked"); }
+  syncReminder();
 }
 
 // ---------- dates (always local time, never UTC) ----------
@@ -402,6 +408,7 @@ function viewSettings() {
             v[0].toUpperCase() + v.slice(1))))),
       h("div", { class: "row spread" }, h("span", {}, "Daily water goal"),
         counter(state.settings.waterGoal, v => { state.settings.waterGoal = v || 1; save(); }, 1, 20))),
+    reminderCard(),
     h("div", { class: "card" }, h("h3", {}, "Your data"),
       h("p", { class: "muted small", style: { marginTop: 0 } },
         "Everything stays private on this device. Back up regularly, or to move to a new phone."),
@@ -439,6 +446,180 @@ function resetData() {
   state = freshState(); save(); render(); toast("Fresh start");
 }
 
+// ---------- daily reminder ----------
+//
+// Browsers can't schedule an exact-time notification without a push server, so
+// reminders come from three places:
+//  1. A repeating calendar event with an alert (.ics) — works on every phone.
+//  2. Periodic Background Sync in sw.js — Chrome/Edge on Android & desktop,
+//     when the app is installed. The browser picks the exact time.
+//  3. A check whenever the app is open or brought back to the front.
+// sw.js can't read localStorage, so the bits it needs are mirrored into the
+// Cache API under REMINDER_URL.
+
+const REMINDER_URL = "./__reminder-state.json";
+const reminderCache = "hh-reminder";
+
+async function readReminderState() {
+  try {
+    const res = await (await caches.open(reminderCache)).match(REMINDER_URL);
+    return res ? await res.json() : {};
+  } catch (e) { return {}; }
+}
+
+async function writeReminderState(patch) {
+  try {
+    const next = Object.assign(await readReminderState(), patch);
+    await (await caches.open(reminderCache)).put(REMINDER_URL,
+      new Response(JSON.stringify(next), { headers: { "Content-Type": "application/json" } }));
+    return next;
+  } catch (e) { return null; }
+}
+
+function remainingToday() {
+  const key = dayKey(today());
+  return state.habits.length - Math.round(completion(key) * state.habits.length);
+}
+
+function reminderText(remaining) {
+  const n = remaining;
+  return {
+    title: `${CFG.title}: evening check-in 🌿`,
+    body: n > 0
+      ? `${n} habit${n === 1 ? "" : "s"} still to tick off today. Small steps count!`
+      : "Every habit done today — brilliant. Tap to log your mood.",
+  };
+}
+
+function syncReminder() {
+  if (!("caches" in window)) return;
+  const r = state.settings.reminder;
+  writeReminderState({ on: r.on, time: r.time, date: dayKey(today()), remaining: remainingToday(), title: CFG.title });
+}
+
+function pastReminderTime() {
+  const [hh, mm] = state.settings.reminder.time.split(":").map(Number);
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes() >= hh * 60 + mm;
+}
+
+async function checkReminder() {
+  const r = state.settings.reminder;
+  if (!r.on || !pastReminderTime() || !("caches" in window)) return;
+  const todayKey = dayKey(today());
+  const saved = await readReminderState();
+  if (saved.lastShown === todayKey) return;
+  const remaining = remainingToday();
+  if (remaining === 0) return; // nothing to nag about
+  await writeReminderState({ lastShown: todayKey });
+  if (document.visibilityState === "visible") {
+    toast(`${remaining} habit${remaining === 1 ? "" : "s"} still to go today 🌿`);
+  } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const { title, body } = reminderText(remaining);
+    reg?.showNotification(title, { body, icon: "icons/icon-192.png", badge: "icons/favicon.png", tag: "daily-reminder" });
+  }
+}
+
+async function enableBackgroundReminder() {
+  let permission = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+  if (permission === "default") permission = await Notification.requestPermission();
+  let background = false;
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg && "periodicSync" in reg && permission === "granted") {
+      await reg.periodicSync.register("daily-reminder", { minInterval: 60 * 60 * 1000 });
+      background = true;
+    }
+  } catch (e) { /* not installed, or the browser said no — calendar still works */ }
+  return { permission, background };
+}
+
+async function backgroundActive() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    return !!reg && "periodicSync" in reg && (await reg.periodicSync.getTags()).includes("daily-reminder");
+  } catch (e) { return false; }
+}
+
+async function disableBackgroundReminder() {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg && "periodicSync" in reg) await reg.periodicSync.unregister("daily-reminder");
+  } catch (e) { /* ignore */ }
+}
+
+function icsDate(d) {
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+}
+
+function downloadCalendarReminder() {
+  const [hh, mm] = state.settings.reminder.time.split(":");
+  const start = `${icsDate(today())}T${hh}${mm}00`;
+  const url = location.href.split("#")[0];
+  const esc = t => t.replace(/[\\,;]/g, m => "\\" + m);
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", `PRODID:-//${esc(CFG.title)}//Reminder//EN`, "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:habits-reminder-${Date.now()}@healthy-habits`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+    // floating local time, so it stays at the chosen time when travelling or on DST changes
+    `DTSTART:${start}`, "DURATION:PT5M",
+    "RRULE:FREQ=DAILY",
+    `SUMMARY:${esc(CFG.title)} check-in 🌿`,
+    `DESCRIPTION:${esc("Tick off today's habits, log your mood and water. Open the app: " + url)}`,
+    `URL:${url}`,
+    "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(CFG.title)} check-in`, "TRIGGER:PT0M", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR", "",
+  ].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const a = h("a", { href: URL.createObjectURL(blob), download: "healthy-habits-reminder.ics" });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast("Open the file to add it to your calendar");
+}
+
+function reminderCard() {
+  const r = state.settings.reminder;
+  const status = h("p", { class: "muted small", id: "reminder-status" });
+  const describe = () => {
+    const perm = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+    if (!r.on) status.textContent = "Get a gentle nudge each day to tick off your habits.";
+    else if (perm === "denied") status.textContent = "Notifications are blocked for this app in your phone settings — use the calendar reminder instead.";
+    else if (perm === "unsupported") status.textContent = "This browser can't show notifications. Add the calendar reminder below so you never miss a day.";
+    else {
+      status.textContent = "You'll get a nudge when you open the app after this time. For a reminder even when the app is closed, add it to your calendar too.";
+      backgroundActive().then(on => {
+        if (on && r.on) status.textContent = "🔔 On. You'll get a notification around this time even when the app is closed (your phone picks the exact minute). For an exact time, add it to your calendar too.";
+      });
+    }
+  };
+  describe();
+
+  const toggle = h("input", { type: "checkbox", role: "switch", class: "switch", checked: r.on,
+    "aria-label": "Daily reminder",
+    onchange: async e => {
+      r.on = e.target.checked; save();
+      if (r.on) {
+        const { permission, background } = await enableBackgroundReminder();
+        toast(background ? "Reminder on 🔔" : permission === "granted" ? "Reminder on" : "Reminder on — add it to your calendar too");
+      } else {
+        await disableBackgroundReminder();
+        toast("Reminder off");
+      }
+      describe();
+    } });
+
+  return h("div", { class: "card" }, h("h3", {}, "Daily reminder"),
+    h("div", { class: "row spread", style: { marginBottom: "12px" } }, h("span", {}, "Remind me every day"), toggle),
+    h("div", { class: "row spread", style: { marginBottom: "4px" } }, h("span", {}, "At"),
+      h("input", { type: "time", value: r.time, "aria-label": "Reminder time", class: "time",
+        onchange: e => { if (e.target.value) { r.time = e.target.value; save(); } } })),
+    status,
+    h("button", { class: "btn ghost", style: { width: "100%" }, onclick: downloadCalendarReminder },
+      "📅  Add reminder to my calendar"));
+}
+
 // ---------- boot ----------
 
 const VIEWS = { today: viewToday, month: viewMonth, year: viewYear, reflect: viewReflect, settings: viewSettings };
@@ -459,8 +640,13 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && dayKey(today()) !== lastDay) {
     lastDay = dayKey(today()); ui.date = today(); render();
   }
+  syncReminder();
+  checkReminder();
 });
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+syncReminder();
+checkReminder();
+setInterval(checkReminder, 60 * 1000);
