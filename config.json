@@ -1,0 +1,38 @@
+{
+  "brand": {
+    "author": "Mark Woodings",
+    "title": "Healthy Habits",
+    "tagline": "A year of small steps that add up",
+    "website": ""
+  },
+  "year": 2027,
+  "week_start": "sunday",
+  "habits": [
+    "Drink 8 glasses of water",
+    "Move for 30 minutes",
+    "Sleep 7+ hours",
+    "5 servings fruit & veg",
+    "10 min mindfulness",
+    "Read 20 pages",
+    "Screen-free hour before bed",
+    "Write 3 gratitudes"
+  ],
+  "blank_habit_rows": 4,
+  "colors": {
+    "background": "#FBF8F2",
+    "primary": "#3E5C49",
+    "secondary": "#7A9E7E",
+    "accent": "#D98E6A",
+    "line": "#D9D4C7",
+    "text": "#3A3A3A",
+    "muted": "#8A8578",
+    "tint": "#EEF3EC"
+  },
+  "mood_colors": {
+    "Great": "#7A9E7E",
+    "Good": "#A8C69F",
+    "Okay": "#F2D48F",
+    "Low": "#E8A87C",
+    "Tough": "#C98B8B"
+  }
+}
