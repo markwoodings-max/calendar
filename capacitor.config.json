@@ -1,0 +1,12 @@
+{
+  "appId": "com.markwoodings.healthyhabits",
+  "appName": "Healthy Habits",
+  "webDir": "app",
+  "backgroundColor": "#FBF8F2",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_habits",
+      "iconColor": "#3E5C49"
+    }
+  }
+}

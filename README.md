@@ -113,14 +113,13 @@ choose one of these:
   paid GitHub plan.)
 - Or give the paid copy an unlisted address.
 
-### Apple App Store / Google Play (optional, later)
+### Apple App Store / Google Play
 
-The same code can be wrapped as a native app with [Capacitor](https://capacitorjs.com/)
-if you want a real App Store or Play Store listing. It costs more: Apple charges
-$99 a year and Google a one-time $25, both run a review, and each store takes a
-15–30% cut. Apple also sometimes rejects apps that are "just a website", so plan
-to add native touches first. Swapping the reminder for Capacitor's Local
-Notifications plugin gives exact-time reminders on both platforms.
+The `android/` and `ios/` folders are the store apps, built from the same `app/`
+code with Capacitor. They add exact-time reminder notifications, haptics and
+share-sheet backups. GitHub Actions builds both (no Mac needed).
+**See [STORES.md](STORES.md)** for the submission steps, the listing copy and
+the privacy answers. Store screenshots and graphics are in `store/`.
 
 ## Customising and regenerating
 

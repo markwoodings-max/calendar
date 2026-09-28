@@ -1,6 +1,9 @@
 "use strict";
 
 const CFG = window.HH_CONFIG;
+// true inside the iOS / Android app (Capacitor); false in a browser or installed PWA
+const NATIVE = window.Capacitor?.isNativePlatform?.() === true;
+const Native = (window.Capacitor && window.Capacitor.Plugins) || {};
 const STORE_KEY = "healthy-habits-v1";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
   "August", "September", "October", "November", "December"];
@@ -171,7 +174,12 @@ function viewToday() {
     const i = day.done.indexOf(id);
     if (i >= 0) day.done.splice(i, 1); else day.done.push(id);
     save(); render();
-    if (i < 0 && completion(key) === 1) toast("Every habit done — brilliant! 🌿");
+    const allDone = i < 0 && completion(key) === 1;
+    if (NATIVE) {
+      (allDone ? Native.Haptics?.notification({ type: "SUCCESS" }) : Native.Haptics?.impact({ style: "LIGHT" }))
+        ?.catch(() => {});
+    }
+    if (allDone) toast("Every habit done — brilliant! 🌿");
   };
 
   return h("section", {},
@@ -417,13 +425,26 @@ function viewSettings() {
         h("button", { class: "btn ghost", onclick: importData }, "Restore backup"),
         h("button", { class: "btn danger", onclick: resetData }, "Reset"))),
     h("p", { class: "footer" }, `${CFG.title} · © ${CFG.author}`, CFG.website ? ` · ${CFG.website}` : "",
-      h("br"), "Not medical advice. For personal use only."),
+      h("br"), "Not medical advice. ",
+      h("a", { href: NATIVE ? CFG.privacyUrl : "privacy.html", target: "_blank", rel: "noopener" }, "Privacy policy")),
   );
 }
 
-function exportData() {
+async function exportData() {
+  const name = `healthy-habits-backup-${dayKey(today())}.json`;
+  if (NATIVE) {
+    // WebViews can't download files, so save to the app cache and open the share sheet
+    try {
+      const { uri } = await Native.Filesystem.writeFile({
+        path: name, data: JSON.stringify(state, null, 2), directory: "CACHE", encoding: "utf8" });
+      await Native.Share.share({ title: `${CFG.title} backup`, files: [uri] });
+    } catch (e) {
+      if (!/cancel/i.test(String(e?.message))) toast("Couldn't create the backup file");
+    }
+    return;
+  }
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const a = h("a", { href: URL.createObjectURL(blob), download: `healthy-habits-backup-${dayKey(today())}.json` });
+  const a = h("a", { href: URL.createObjectURL(blob), download: name });
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -492,6 +513,7 @@ function reminderText(remaining) {
 }
 
 function syncReminder() {
+  if (NATIVE) { scheduleNativeSoon(); return; }
   if (!("caches" in window)) return;
   const r = state.settings.reminder;
   writeReminderState({ on: r.on, time: r.time, date: dayKey(today()), remaining: remainingToday(), title: CFG.title });
@@ -505,7 +527,7 @@ function pastReminderTime() {
 
 async function checkReminder() {
   const r = state.settings.reminder;
-  if (!r.on || !pastReminderTime() || !("caches" in window)) return;
+  if (NATIVE || !r.on || !pastReminderTime() || !("caches" in window)) return;
   const todayKey = dayKey(today());
   const saved = await readReminderState();
   if (saved.lastShown === todayKey) return;
@@ -579,6 +601,77 @@ function downloadCalendarReminder() {
   toast("Open the file to add it to your calendar");
 }
 
+// In the iOS / Android app, reminders are real local notifications scheduled on
+// the device at the exact time. We schedule the next 14 days individually (not one
+// repeating alarm) so that today's can be skipped once every habit is done, and
+// today's can say how many are left. Re-scheduled whenever data changes or the
+// app comes back to the front, so it keeps rolling forward.
+
+const NATIVE_ID_BASE = 1000;
+const NATIVE_DAYS = 14;
+let nativeTimer;
+
+function scheduleNativeSoon() {
+  clearTimeout(nativeTimer);
+  nativeTimer = setTimeout(() => scheduleNative().catch(() => {}), 600);
+}
+
+async function scheduleNative() {
+  const LN = Native.LocalNotifications;
+  if (!LN) return;
+  const { notifications } = await LN.getPending();
+  const ours = notifications.filter(n => n.id >= NATIVE_ID_BASE && n.id < NATIVE_ID_BASE + 100);
+  if (ours.length) await LN.cancel({ notifications: ours.map(n => ({ id: n.id })) });
+
+  const r = state.settings.reminder;
+  if (!r.on) return;
+  const [hh, mm] = r.time.split(":").map(Number);
+  const now = new Date();
+  const list = [];
+  for (let i = 0; i < NATIVE_DAYS; i++) {
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, hh, mm);
+    if (at <= now) continue;
+    let body = "Time to tick off today's habits and log your mood. Small steps count!";
+    if (i === 0) {
+      const left = remainingToday();
+      if (left === 0) continue; // already done everything today
+      body = reminderText(left).body;
+    }
+    list.push({ id: NATIVE_ID_BASE + i, title: reminderText(1).title, body,
+      schedule: { at, allowWhileIdle: true }, smallIcon: "ic_stat_habits", iconColor: "#3E5C49" });
+  }
+  if (list.length) await LN.schedule({ notifications: list });
+}
+
+async function nativePermission(ask) {
+  const LN = Native.LocalNotifications;
+  if (!LN) return "unsupported";
+  let { display } = await LN.checkPermissions();
+  if (ask && display !== "granted" && display !== "denied") ({ display } = await LN.requestPermissions());
+  return display;
+}
+
+function nativeReminderCard(r, toggleRow, timeRow) {
+  const status = h("p", { class: "muted small" });
+  const describe = async () => {
+    if (!r.on) { status.textContent = "Get a gentle nudge each day to tick off your habits."; return; }
+    const perm = await nativePermission(false);
+    status.textContent = perm === "granted"
+      ? "🔔 You'll get a notification at this time every day. It's skipped on days you've already done everything."
+      : "Notifications are turned off for this app. Turn them on in your phone's Settings → Notifications → " + CFG.title + ".";
+  };
+  describe();
+  toggleRow.querySelector("input").addEventListener("change", async e => {
+    if (e.target.checked) {
+      const perm = await nativePermission(true);
+      scheduleNativeSoon();
+      toast(perm === "granted" ? "Reminder on 🔔" : "Allow notifications in Settings to get reminders");
+    } else toast("Reminder off");
+    describe();
+  });
+  return h("div", { class: "card" }, h("h3", {}, "Daily reminder"), toggleRow, timeRow, status);
+}
+
 function reminderCard() {
   const r = state.settings.reminder;
   const status = h("p", { class: "muted small", id: "reminder-status" });
@@ -596,6 +689,17 @@ function reminderCard() {
   };
   describe();
 
+  const timeRow = h("div", { class: "row spread", style: { marginBottom: "4px" } }, h("span", {}, "At"),
+    h("input", { type: "time", value: r.time, "aria-label": "Reminder time", class: "time",
+      onchange: e => { if (e.target.value) { r.time = e.target.value; save(); } } }));
+
+  if (NATIVE) {
+    const sw = h("input", { type: "checkbox", role: "switch", class: "switch", checked: r.on, "aria-label": "Daily reminder",
+      onchange: e => { r.on = e.target.checked; save(); } });
+    return nativeReminderCard(r,
+      h("div", { class: "row spread", style: { marginBottom: "12px" } }, h("span", {}, "Remind me every day"), sw), timeRow);
+  }
+
   const toggle = h("input", { type: "checkbox", role: "switch", class: "switch", checked: r.on,
     "aria-label": "Daily reminder",
     onchange: async e => {
@@ -612,9 +716,7 @@ function reminderCard() {
 
   return h("div", { class: "card" }, h("h3", {}, "Daily reminder"),
     h("div", { class: "row spread", style: { marginBottom: "12px" } }, h("span", {}, "Remind me every day"), toggle),
-    h("div", { class: "row spread", style: { marginBottom: "4px" } }, h("span", {}, "At"),
-      h("input", { type: "time", value: r.time, "aria-label": "Reminder time", class: "time",
-        onchange: e => { if (e.target.value) { r.time = e.target.value; save(); } } })),
+    timeRow,
     status,
     h("button", { class: "btn ghost", style: { width: "100%" }, onclick: downloadCalendarReminder },
       "📅  Add reminder to my calendar"));
@@ -644,7 +746,12 @@ document.addEventListener("visibilitychange", () => {
   checkReminder();
 });
 
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+if (NATIVE) {
+  document.documentElement.classList.add("native");
+  Native.LocalNotifications?.addListener("localNotificationActionPerformed", () => {
+    ui.date = today(); go("today");
+  });
+} else if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 syncReminder();

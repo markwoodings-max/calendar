@@ -235,3 +235,4 @@ input.time {
   border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 8px 10px;
   font-weight: 700; color: var(--primary);
 }
+.footer a { color: inherit; }
