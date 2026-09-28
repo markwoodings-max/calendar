@@ -7,7 +7,8 @@ wrapped with [Capacitor](https://capacitorjs.com/). GitHub Actions builds them
 | | Apple App Store | Google Play |
 |---|---|---|
 | Developer account | $99 / year | $25 one-off |
-| Store's cut of sales | 15% (Small Business Program) | 15% |
+| Price | **$3.99** (one-off, paid up front) | **$3.99** (one-off, paid up front) |
+| Store's cut of sales | 15% with the Small Business Program (you get about $3.39 per sale) | 15% (about $3.39 per sale) |
 | Review time | usually 1–3 days | a few hours to a few days (first review can take longer) |
 | Testing before launch | TestFlight | New personal accounts must run a **closed test with 12 testers for 14 days** before going public |
 
@@ -38,13 +39,18 @@ These native features matter because Apple rejects apps that are just a website 
 ## Google Play: step by step
 
 1. **Create a developer account** at https://play.google.com/console (the $25 fee, plus identity verification).
+   Then set up a **payments profile** (Play Console → *Settings* → *Payments profile*). Paid apps can't be
+   published without one, and it's where your sales are paid out.
 2. **Add the upload key to GitHub.** You were given `healthy-habits-upload.jks` and a
    `README-KEEP-SAFE.txt` file. Add the four secrets it lists at
    https://github.com/markwoodings-max/calendar/settings/secrets/actions and keep the files backed up somewhere private.
 3. **Build.** Go to https://github.com/markwoodings-max/calendar/actions →
    **Build mobile apps** → **Run workflow**. When it finishes, download the
    **android-play-store-aab** artifact and unzip it to get `app-release.aab`.
-4. **In Play Console:** *Create app* → name "Healthy Habits", type App, Paid or Free (see Pricing below).
+4. **In Play Console:** *Create app* → name "Healthy Habits", type App, **Paid**.
+   ⚠️ Choose Paid here. Google never lets a free app become paid later.
+   Then go to *Monetize* → *App pricing* → set **USD 3.99**. Google converts it to local prices in
+   other countries, and you can adjust any of them.
 5. **Set up the store listing** using the copy below, the screenshots, the feature graphic and the 512 icon.
 6. **Fill in the App content forms:**
    - **Privacy policy:** the URL above.
@@ -64,6 +70,11 @@ run the workflow and upload the new `.aab`. The version code increases automatic
 
 1. **Enrol** in the Apple Developer Program at https://developer.apple.com/programs/ ($99/yr).
    Enrolling as an individual is quickest.
+   Then in App Store Connect → *Business*, accept the **Paid Apps Agreement** and add your bank and
+   tax details. A paid app can't go on sale until these show as "Active".
+   Also apply for the **App Store Small Business Program**
+   (https://developer.apple.com/app-store/small-business-program/). It cuts Apple's commission
+   from 30% to 15%.
 2. **Create the app record** in https://appstoreconnect.apple.com → *Apps* → **+** → New App:
    - Platform: iOS
    - Name: Healthy Habits (it must be unique on the store; see alternatives below)
@@ -83,7 +94,9 @@ run the workflow and upload the new `.aab`. The version code increases automatic
    the app and uploads it to App Store Connect. About 10–30 minutes later it appears under **TestFlight**.
 7. **Test on your iPhone** with the TestFlight app. Add yourself under *Internal Testing*.
 8. **Fill in the listing** (copy below): screenshots (6.9″), description, keywords, support URL,
-   privacy policy URL, category, age rating questionnaire (all "None", which gives 4+) and price.
+   privacy policy URL, category and age rating questionnaire (all "None", which gives 4+).
+   Under *Pricing and Availability*, set the base price to **USD 3.99**; Apple sets the other
+   countries' prices from it.
 9. **App Privacy:** choose **"Data Not Collected"**.
 10. **Select the build** on the version page → **Add for Review** → **Submit**.
 
@@ -143,10 +156,16 @@ habit,tracker,routine,goals,mood,water,sleep,wellness,self care,journal,planner,
 
 ## Pricing
 
-- **Paid up front ($2.99–$4.99)** is simplest and matches the "no ads, no tracking" promise.
-- **Free**, with the printable PDF sold separately, gets more downloads and reviews.
+**$3.99, paid up front**, in both stores. There's no free tier, no ads and no in-app
+purchases, which fits the "private, no tracking" message. You set the price in the store
+consoles (steps above), not in the code, so you can change it any time without an update.
 
-Both work with the code as it is. A "free + premium unlock" model would need in-app purchases (e.g. RevenueCat), which isn't built yet.
+- **About $3.39 per sale** after the 15% store fee (before tax/VAT, which the stores handle for you).
+- **Launch discounts:** both stores let you schedule temporary price drops, e.g. $1.99 for launch week.
+- **The web version:** the GitHub Pages copy of the app is free for anyone with the link.
+  Once the store apps are live, reduce that site to just the privacy policy (or a page linking to the stores).
+- **Bundles:** you can still sell the printable PDF separately, or give PDF buyers a
+  promo code for the app (App Store: *Promo Codes*; Play: *Promotions*).
 
 ## Updating the apps
 
