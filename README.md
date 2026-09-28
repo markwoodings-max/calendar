@@ -78,6 +78,41 @@ A shared link can be passed on to people who didn't buy. For a $5–$15 product
 that is usually an acceptable trade-off. If it becomes a problem, you can add
 license keys (Gumroad and Lemon Squeezy both offer them).
 
+### Testing it online
+
+This repo publishes `app/` to GitHub Pages automatically
+(`.github/workflows/pages.yml`) at **https://markwoodings-max.github.io/calendar/**.
+
+It needs a one-time switch: **Settings → Pages → Build and deployment → Source:
+GitHub Actions**. After that, every push that changes `app/` updates the site
+within about a minute. You can also re-run it from **Actions → Publish app →
+Run workflow**.
+
+Checklist on your phone:
+
+1. **Install it.**
+   - iPhone: Safari → Share → *Add to Home Screen*.
+   - Android: Chrome → ⋮ → *Install app*.
+2. Open it from the home-screen icon. It should open full screen with no browser bar.
+3. Tick a few habits, set a mood and water count, then close and reopen the app. Everything should still be there.
+4. Turn on Airplane mode and open the app. It should still work.
+5. **Habits tab → Daily reminder:**
+   - Switch it on and allow notifications.
+   - Set the time a couple of minutes ahead.
+   - Tap *Add reminder to my calendar* and add the event. The calendar alert should fire at that time.
+   - With the app open after that time, you should see the "habits still to go" nudge.
+   - On Android, a background notification may also arrive (the phone picks the exact minute).
+6. Try Export backup, then Restore backup.
+
+The Pages site is public and this repo is public, so anyone with the link can
+use the app for free. That's fine for testing. Before you start selling,
+choose one of these:
+
+- Make the repo private and host the paid copy elsewhere, e.g. Netlify: drag
+  the `app` folder onto app.netlify.com/drop. (Pages on a private repo needs a
+  paid GitHub plan.)
+- Or give the paid copy an unlisted address.
+
 ### Apple App Store / Google Play (optional, later)
 
 The same code can be wrapped as a native app with [Capacitor](https://capacitorjs.com/)
